@@ -1,0 +1,57 @@
+version: '2'
+
+services:
+    fs:
+        image: busybox
+        volumes:
+            - ./code:/var/www:cached
+
+    nginx:
+        image: nginx
+        volumes_from:
+            - fs
+        volumes:
+            - ./docker/nginx/shared/sites-enabled:/etc/nginx/conf.d:ro
+        ports:
+            - 11080:80
+        working_dir: /var/www
+        links:
+            - phpfpm
+
+    mysql:
+        image: mysql:5.7
+        environment:
+            MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+
+    phpfpm:
+        build: ./docker/phpfpm
+        volumes_from:
+            - fs
+        working_dir: /var/www
+        links:
+            - mysql
+
+    phpcli: &phpcli
+        build: ./docker/phpcli
+        volumes_from:
+            - fs
+        working_dir: /var/www
+        entrypoint: php
+        links:
+            - mysql
+
+    adminer:
+        image: adminer
+        restart: always
+        ports:
+            - 11081:8080
+        links:
+            - mysql
+
+    composer:
+        <<: *phpcli
+        entrypoint: composer
+
+    phpcs:
+        <<: *phpcli
+        entrypoint: php-cs-fixer
